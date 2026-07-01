@@ -8,11 +8,8 @@
     'node_builtin_modules_path%': '',
     # `node` executable target name.
     'node_core_target_name%': 'node',
-    # Derived flag from `node_shared`.
-    # On most platforms, this is `static_library` if `node_shared` is false and `shared_library` if `node_shared` is true.
-    # AIX needs to generate static library first and then link to shared library `node_aix_shared`.
-    # TODO(legendecas): move this to depend on target `node_base` in AIX build .
-    'node_intermediate_lib_type%': 'static_library',
+    # `libnode` target type, `static_library` if `node_shared` is false and `shared_library` if `node_shared` is true.
+    'node_lib_type%': 'static_library',
     # `libnode` target name, can be a `static_library` or `shared_library` based on `node_shared`.
     # NOTE: Gyp will prefix this with `lib` if this name does not start with `lib`.
     'node_lib_target_name%': 'libnode',
@@ -139,6 +136,7 @@
       'src/node_http_parser.cc',
       'src/node_http2.cc',
       'src/node_i18n.cc',
+      'src/node_ipc_serdes.cc',
       'src/node_locks.cc',
       'src/node_main_instance.cc',
       'src/node_messaging.cc',
@@ -202,6 +200,7 @@
       'src/timers.cc',
       'src/timer_wrap.cc',
       'src/tracing/agent.cc',
+      'src/tracing/agent_legacy.cc',
       'src/tracing/node_trace_buffer.cc',
       'src/tracing/node_trace_writer.cc',
       'src/tracing/trace_event.cc',
@@ -340,6 +339,7 @@
       'src/tcp_wrap.h',
       'src/timers.h',
       'src/tracing/agent.h',
+      'src/tracing/agent_legacy.h',
       'src/tracing/node_trace_buffer.h',
       'src/tracing/node_trace_writer.h',
       'src/tracing/trace_event.h',
@@ -488,8 +488,18 @@
     'node_ffi_sources': [
       'src/node_ffi.cc',
       'src/node_ffi.h',
+      'src/ffi/platforms/arm64.cc',
+      'src/ffi/platforms/loong64.cc',
+      'src/ffi/platforms/ppc64.cc',
+      'src/ffi/platforms/riscv64.cc',
+      'src/ffi/platforms/s390x.cc',
+      'src/ffi/platforms/x64.cc',
       'src/ffi/data.cc',
       'src/ffi/data.h',
+      'src/ffi/fast.cc',
+      'src/ffi/fast.h',
+      'src/ffi/jit_memory.cc',
+      'src/ffi/jit_memory.h',
       'src/ffi/types.cc',
       'src/ffi/types.h',
     ],
@@ -503,17 +513,7 @@
       }],
       [ 'node_shared=="true"', {
         'node_target_type%': 'shared_library',
-        'conditions': [
-          ['OS in "aix os400"', {
-            # For AIX, always generate static library first,
-            # It needs an extra step to generate exp and
-            # then use both static lib and exp to create
-            # shared lib.
-            'node_intermediate_lib_type': 'static_library',
-          }, {
-            'node_intermediate_lib_type': 'shared_library',
-          }],
-        ],
+        'node_lib_type': 'shared_library',
       }, {
         'node_target_type%': 'executable',
       }],
@@ -625,6 +625,10 @@
         'src/node_main.cc'
       ],
 
+      'dependencies': [
+        '<(node_lib_target_name)',
+      ],
+
       'msvs_settings': {
         'VCLinkerTool': {
           'GenerateMapFile': 'true', # /MAP
@@ -657,25 +661,13 @@
             'WARNING_CFLAGS': [ '-Werror' ],
           },
         }],
-        [ 'node_intermediate_lib_type=="static_library" and '
-            'node_shared=="true" and OS in "aix os400"', {
-          # For AIX, shared lib is linked by static lib and .exp. In the
-          # case here, the executable needs to link to shared lib.
-          # Therefore, use 'node_aix_shared' target to generate the
-          # shared lib and then executable.
-          'dependencies': [ 'node_aix_shared' ],
-        }, {
-          'dependencies': [ '<(node_lib_target_name)' ],
-          'conditions': [
-            ['OS=="win" and node_shared=="true"', {
-              'dependencies': ['generate_node_def'],
-              'msvs_settings': {
-                'VCLinkerTool': {
-                  'ModuleDefinitionFile': '<(PRODUCT_DIR)/<(node_core_target_name).def',
-                },
-              },
-            }],
-          ],
+        ['node_shared=="true" and OS=="win"', {
+          'dependencies': ['generate_node_def'],
+          'msvs_settings': {
+            'VCLinkerTool': {
+              'ModuleDefinitionFile': '<(PRODUCT_DIR)/<(node_core_target_name).def',
+            },
+          },
         }],
         [ 'node_shared=="false"', {
           # Keep this whole-archive section in sync with the `node_lib` target below.
@@ -1102,6 +1094,7 @@
             '<(SHARED_INTERMEDIATE_DIR)/node_javascript.cc',
           ],
           'action': [
+            '<@(emulator)',
             '<(node_js2c_exec)',
             '<@(_outputs)',
             'lib',
@@ -1114,7 +1107,7 @@
     }, # node_base
     {
       'target_name': '<(node_lib_target_name)',
-      'type': '<(node_intermediate_lib_type)',
+      'type': '<(node_lib_type)',
       'includes': [
         'node.gypi',
       ],
@@ -1168,6 +1161,7 @@
                     '<(SHARED_INTERMEDIATE_DIR)/node_snapshot.cc',
                   ],
                   'action': [
+                    '<@(emulator)',
                     '<(node_mksnapshot_exec)',
                     '--build-snapshot',
                     '<(node_snapshot_main)',
@@ -1187,6 +1181,7 @@
                     '<(SHARED_INTERMEDIATE_DIR)/node_snapshot.cc',
                   ],
                   'action': [
+                    '<@(emulator)',
                     '<@(_inputs)',
                     '<@(_outputs)',
                   ],
@@ -1234,7 +1229,10 @@
           },
         }],
         ['node_shared=="true" and OS in "aix os400"', {
-          'product_name': 'node_base',
+          'ldflags': ['--shared'],
+          'direct_dependent_settings': {
+            'ldflags': [ '-Wl,-brtl' ],
+          },
         }],
         [ 'node_shared=="true" and OS=="win"', {
           'sources': [
@@ -1816,33 +1814,6 @@
   ], # end targets
 
   'conditions': [
-    ['OS in "aix os400" and node_shared=="true"', {
-      'targets': [
-        {
-          'target_name': 'node_aix_shared',
-          'type': 'shared_library',
-          'product_name': '<(node_core_target_name)',
-          'ldflags': ['--shared'],
-          'product_extension': '<(shlib_suffix)',
-          'includes': [
-            'node.gypi'
-          ],
-          'dependencies': ['<(node_lib_target_name)'],
-          'include_dirs': [
-            'src',
-            'deps/v8/include',
-          ],
-          'sources': [
-            '<@(library_files)',
-            '<@(deps_files)',
-            'common.gypi',
-          ],
-          'direct_dependent_settings': {
-            'ldflags': [ '-Wl,-brtl' ],
-          },
-        },
-      ]
-    }], # end aix section
     ['OS=="win" and node_shared=="true"', {
      'targets': [
        {
@@ -1869,6 +1840,7 @@
                '<(PRODUCT_DIR)/<(node_core_target_name).def',
              ],
              'action': [
+               '<@(emulator)',
                '<(PRODUCT_DIR)/gen_node_def.exe',
                '<@(_inputs)',
                '<@(_outputs)',

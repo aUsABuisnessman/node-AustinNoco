@@ -656,6 +656,11 @@ EnvironmentOptionsParser::EnvironmentOptionsParser() {
   AddAlias("--loader", "--experimental-loader");
   AddOption("--experimental-modules", "", NoOp{}, kAllowedInEnvvar);
   AddOption("--experimental-wasm-modules", "", NoOp{}, kAllowedInEnvvar);
+  AddOption("--experimental-import-text",
+            "experimental support for importing source as text with import "
+            "attributes",
+            &EnvironmentOptions::experimental_import_text,
+            kAllowedInEnvvar);
   AddOption("--experimental-import-meta-resolve",
             "experimental ES Module import.meta.resolve() parentURL support",
             &EnvironmentOptions::experimental_import_meta_resolve,
@@ -917,6 +922,10 @@ EnvironmentOptionsParser::EnvironmentOptionsParser() {
             &EnvironmentOptions::experimental_config_file_path,
             kDisallowedInEnvvar);
   AddAlias("--experimental-default-config-file", "--experimental-config-file");
+  AddOption("--experimental-package-map",
+            "use the specified file for package map resolution",
+            &EnvironmentOptions::experimental_package_map_path,
+            kAllowedInEnvvar);
   AddOption("--test",
             "launch test runner on startup",
             &EnvironmentOptions::test_runner,

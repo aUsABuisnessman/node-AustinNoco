@@ -139,6 +139,7 @@ class EnvironmentOptions : public Options {
   std::string localstorage_file;
   bool experimental_global_navigator = true;
   bool experimental_global_web_crypto = true;
+  bool experimental_import_text = EXPERIMENTALS_DEFAULT_VALUE;
   bool experimental_import_meta_resolve = EXPERIMENTALS_DEFAULT_VALUE;
   std::string input_type;  // Value of --input-type
   bool entry_is_url = false;
@@ -279,6 +280,7 @@ class EnvironmentOptions : public Options {
   bool report_exclude_env = false;
   bool report_exclude_network = false;
   std::string experimental_config_file_path;
+  std::string experimental_package_map_path;
 
   inline DebugOptions* get_debug_options() { return &debug_options_; }
   inline const DebugOptions& debug_options() const { return debug_options_; }

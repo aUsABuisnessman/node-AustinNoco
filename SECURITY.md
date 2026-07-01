@@ -374,6 +374,21 @@ the community they pose.
   responsibility to properly handle errors by attaching appropriate
   `'error'` event listeners to EventEmitters that may emit errors.
 
+#### Exceptions Thrown by Application Callbacks (CWE-248)
+
+* Node.js trusts the application code it is asked to run, including callbacks
+  that are invoked by Node.js APIs. If an application callback throws an
+  uncaught exception, any resulting crash is not considered a vulnerability in
+  Node.js.
+* For example, [CVE-2026-21637](https://www.cve.org/CVERecord?id=CVE-2026-21637)
+  was triaged as a Node.js vulnerability, but scenarios that require TLS
+  callbacks such as `ALPNCallback`, `SNICallback`, or `pskCallback` to throw
+  are outside the Node.js threat model. Future reports of similar issues,
+  where the crash depends on application callbacks throwing uncaught
+  exceptions, will not be treated as Node.js vulnerabilities. It is the
+  application's responsibility to handle unexpected callback input and report
+  errors without throwing uncaught exceptions.
+
 #### Permission Model Boundaries (`--permission`)
 
 The Node.js [Permission Model](https://nodejs.org/api/permissions.html)
@@ -405,6 +420,24 @@ The following are **not** vulnerabilities in Node.js:
 * **`worker_threads` with modified `execArgv`**: Workers inherit the permission
   restrictions of their parent process. Passing an empty or modified `execArgv`
   to a worker does not grant it additional permissions.
+
+#### Virtual File System (`node:vfs`)
+
+The experimental [Virtual File System](https://nodejs.org/api/vfs.html)
+(`node:vfs`) is a virtualized file-system API for tests, fixtures, embedded
+assets, and application-managed storage. It is **not** a sandbox, permission
+system, or security boundary for untrusted code.
+
+Code that can load `node:vfs`, receive a `VirtualFileSystem` instance, install a
+mount, choose a provider, or pass paths to VFS APIs is trusted application code.
+A VFS mount only redirects matching file-system calls; it does not hide or
+restrict access to the host file system. `RealFSProvider` root checks and
+read-only providers are implementation behavior, not security guarantees.
+
+Reports that rely on using VFS to isolate untrusted JavaScript, native code, or
+user-controlled paths are not considered Node.js vulnerabilities. Use OS-level
+isolation, such as separate users, containers, or platform sandboxes, when a
+security boundary is required.
 
 #### V8 Sandbox
 
@@ -517,6 +550,7 @@ In addition, these individuals have access:
 * [cjihrig](https://github.com/cjihrig) **Colin Ihrig**
 * [joesepi](https://github.com/joesepi) - **Joe Sepi**
 * [juanarbol](https://github.com/juanarbol) **Juan Jose Arboleda**
+* [sxa](https://github.com/sxa) - **Stewart X Addison**
 * [ulisesgascon](https://github.com/ulisesgascon) **Ulises Gascón**
 * [vdeturckheim](https://github.com/vdeturckheim) - **Vladimir de Turckheim**
 
@@ -531,6 +565,7 @@ the Node.js program on HackerOne.
 * [@anonrig](https://github.com/anonrig) - Yagiz Nizipli
 * [@bengl](https://github.com/bengl) - Bryan English
 * [@benjamingr](https://github.com/benjamingr) - Benjamin Gruenbaum
+* [@BethGriggs](https://github.com/BethGriggs) - Beth Griggs
 * [@bmeck](https://github.com/bmeck) - Bradley Farias
 * [@bnoordhuis](https://github.com/bnoordhuis) - Ben Noordhuis
 * [@BridgeAR](https://github.com/BridgeAR) - Ruben Bridgewater
@@ -553,6 +588,7 @@ the Node.js program on HackerOne.
 * [@ruyadorno](https://github.com/ruyadorno) - Ruy Adorno
 * [@santigimeno](https://github.com/santigimeno) - Santiago Gimeno
 * [@ShogunPanda](https://github.com/ShogunPanda) - Paolo Insogna
+* [@sxa](https://github.com/sxa) - Stewart X Addison
 * [@targos](https://github.com/targos) - Michaël Zasso
 * [@tniessen](https://github.com/tniessen) - Tobias Nießen
 * [@UlisesGascon](https://github.com/UlisesGascon) - Ulises Gascón
